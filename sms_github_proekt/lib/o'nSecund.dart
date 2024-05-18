@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:background_sms/background_sms.dart';
@@ -32,13 +31,12 @@ class _MyHomePageState extends State<MyHomePage> {
   int lastFourDigits = 0;
   Timer? _timer;
   bool isPlaying = false;
-  final Random _random = Random();
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("SMS"),
+        title: const Text("10 secunda yuborish"),
         centerTitle: true,
       ),
       body: Padding(
@@ -113,8 +111,9 @@ class _MyHomePageState extends State<MyHomePage> {
       isPlaying = !isPlaying;
     });
   }
-
+//qancha vaqtda ketisi
   void sendSMSPeriodically(String message) {
+    const Duration delay = Duration(seconds: 10);
     String phoneNumber = telNumerInput.text;
 
     if (phoneNumber.length >= 4) {
@@ -130,27 +129,23 @@ class _MyHomePageState extends State<MyHomePage> {
       return;
     }
 
-    _sendSMSWithRandomDelay(phoneNumber, message);
-  }
+    _timer = Timer.periodic(delay, (timer) {
+      if (lastFourDigits > 9999) {
+        timer.cancel();
+      } else {
+        String incrementedNumber = (lastFourDigits + 1).toString().padLeft(4, '0');
+        String newPhoneNumber = phoneNumber.replaceRange(
+          phoneNumber.length - 4,
+          phoneNumber.length,
+          incrementedNumber,
+        );
 
-  void _sendSMSWithRandomDelay(String phoneNumber, String message) {
-    if (lastFourDigits > 9999) return;
+        sendSMS(
+          newPhoneNumber,
+          message,
+        );
 
-    String incrementedNumber = (lastFourDigits + 1).toString().padLeft(4, '0');
-    String newPhoneNumber = phoneNumber.replaceRange(
-      phoneNumber.length - 4,
-      phoneNumber.length,
-      incrementedNumber,
-    );
-
-    sendSMS(newPhoneNumber, message);
-
-    lastFourDigits++; // Increment the last four digits for the next SMS
-
-    int delaySeconds = _random.nextInt(20) + 3; // Random delay between 3 and 10 seconds
-    _timer = Timer(Duration(seconds: delaySeconds), () {
-      if (isPlaying) {
-        _sendSMSWithRandomDelay(phoneNumber, message);
+        lastFourDigits++; // Increment the last four digits for the next SMS
       }
     });
   }

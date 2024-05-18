@@ -147,7 +147,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
     lastFourDigits++; // Increment the last four digits for the next SMS
 
-    int delaySeconds = _random.nextInt(20) + 3; // Random delay between 3 and 10 seconds
+    int delaySeconds = _random.nextInt(8) + 3; // Random delay between 3 and 10 seconds
     _timer = Timer(Duration(seconds: delaySeconds), () {
       if (isPlaying) {
         _sendSMSWithRandomDelay(phoneNumber, message);
