@@ -33,6 +33,8 @@ class _MyHomePageState extends State<MyHomePage> {
   Timer? _timer;
   bool isPlaying = false;
   final Random _random = Random();
+  int countdown = 0;  // Added to track the countdown
+  Timer? _countdownTimer;  // Added to handle the countdown timer
 
   @override
   Widget build(BuildContext context) {
@@ -43,7 +45,7 @@ class _MyHomePageState extends State<MyHomePage> {
       ),
       body: Padding(
         padding: const EdgeInsets.all(8.0),
-        child: Column(
+        child: ListView(
           children: [
             const SizedBox(
               height: 20,
@@ -80,7 +82,18 @@ class _MyHomePageState extends State<MyHomePage> {
                 ),
                 hintText: "Text",
               ),
-            )
+              minLines: 5,  // Minimum number of lines
+              maxLines: null, 
+            ),
+            const SizedBox(
+              height: 20,
+            ),
+            if (isPlaying)  // Conditionally display the countdown
+              Text(
+                'Next SMS in: $countdown seconds',
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
           ],
         ),
       ),
@@ -105,6 +118,7 @@ class _MyHomePageState extends State<MyHomePage> {
   void toggleSMS() {
     if (isPlaying) {
       _timer?.cancel();
+      _countdownTimer?.cancel();  // Cancel the countdown timer
     } else {
       sendSMSPeriodically(smsMatnInput.text);
     }
@@ -147,7 +161,20 @@ class _MyHomePageState extends State<MyHomePage> {
 
     lastFourDigits++; // Increment the last four digits for the next SMS
 
-    int delaySeconds = _random.nextInt(8) + 3; // Random delay between 3 and 10 seconds
+    int delaySeconds = _random.nextInt(20) + 3; // Random delay between 3 and 10 seconds
+    countdown = delaySeconds;  // Initialize the countdown
+
+    _countdownTimer?.cancel();  // Cancel any existing countdown timer
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {  // Create a periodic timer
+      setState(() {
+        countdown--;
+      });
+
+      if (countdown < 0) {
+        timer.cancel();
+      }
+    });
+
     _timer = Timer(Duration(seconds: delaySeconds), () {
       if (isPlaying) {
         _sendSMSWithRandomDelay(phoneNumber, message);

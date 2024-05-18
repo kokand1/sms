@@ -14,6 +14,7 @@ class MyaApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const MaterialApp(
+      debugShowCheckedModeBanner: false,
       home: MyHomePage(),
     );
   }
@@ -33,21 +34,42 @@ class _MyHomePageState extends State<MyHomePage> {
   Timer? _timer;
   bool isPlaying = false;
   final Random _random = Random();
+  int countdown = 0;
+  Timer? _countdownTimer;
+  String currentPhoneNumber = '';
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("SMS"),
         centerTitle: true,
+        title:   Row(mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.next_plan),
+            SizedBox(width: 10,),
+            Text(
+                        '${getIncrementedPhoneNumber()}',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+          ],
+        ),
+
+        backgroundColor: Color.fromARGB(255, 3, 249, 52),
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 10,top: 15),
+          child: Text(
+                      ' $countdown',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+        ),
       ),
       body: Padding(
         padding: const EdgeInsets.all(8.0),
-        child: Column(
+        child: ListView(
           children: [
-            const SizedBox(
-              height: 20,
-            ),
+            const SizedBox(height: 20),
             TextField(
               controller: telNumerInput,
               keyboardType: TextInputType.phone,
@@ -66,9 +88,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 }
               },
             ),
-            const SizedBox(
-              height: 20,
-            ),
+            const SizedBox(height: 20),
             TextField(
               controller: smsMatnInput,
               decoration: const InputDecoration(
@@ -80,19 +100,29 @@ class _MyHomePageState extends State<MyHomePage> {
                 ),
                 hintText: "Text",
               ),
-            )
+              minLines: 5,
+              maxLines: null,
+            ),
+            const SizedBox(height: 20),
+            if (isPlaying)
+              Column(
+                children: [
+                 
+                
+                ],
+              ),
           ],
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        child: Icon(isPlaying ? Icons.pause : Icons.play_arrow),
+        child: Icon(isPlaying ? Icons.stop : Icons.play_arrow),
         onPressed: () async {
           if (await isPermissionGranted()) {
             bool? customSimSupport = await supportsCustomSim();
             if (customSimSupport != null && customSimSupport) {
               toggleSMS();
             } else {
-              // No custom SIM support
+              showSnackBar("Custom SIM support not available");
             }
           } else {
             getPermission();
@@ -104,14 +134,23 @@ class _MyHomePageState extends State<MyHomePage> {
 
   void toggleSMS() {
     if (isPlaying) {
-      _timer?.cancel();
+      pauseSMS();
     } else {
-      sendSMSPeriodically(smsMatnInput.text);
+      resumeSMS();
     }
 
     setState(() {
       isPlaying = !isPlaying;
     });
+  }
+
+  void pauseSMS() {
+    _timer?.cancel();
+    _countdownTimer?.cancel();
+  }
+
+  void resumeSMS() {
+    sendSMSPeriodically(smsMatnInput.text);
   }
 
   void sendSMSPeriodically(String message) {
@@ -143,11 +182,28 @@ class _MyHomePageState extends State<MyHomePage> {
       incrementedNumber,
     );
 
+    setState(() {
+      currentPhoneNumber = newPhoneNumber;
+    });
+
     sendSMS(newPhoneNumber, message);
 
-    lastFourDigits++; // Increment the last four digits for the next SMS
+    lastFourDigits++;
 
-    int delaySeconds = _random.nextInt(20) + 3; // Random delay between 3 and 10 seconds
+    int delaySeconds = _random.nextInt(20) + 3;
+    countdown = delaySeconds;
+
+    _countdownTimer?.cancel();
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      setState(() {
+        countdown--;
+      });
+
+      if (countdown <= 0) {
+        timer.cancel();
+      }
+    });
+
     _timer = Timer(Duration(seconds: delaySeconds), () {
       if (isPlaying) {
         _sendSMSWithRandomDelay(phoneNumber, message);
@@ -172,6 +228,19 @@ class _MyHomePageState extends State<MyHomePage> {
 
   Future<bool?> supportsCustomSim() async =>
       await BackgroundSms.isSupportCustomSim;
+
+  String getIncrementedPhoneNumber() {
+    String incrementedPhoneNumber = '';
+
+    if (currentPhoneNumber.isNotEmpty && int.tryParse(currentPhoneNumber) != null) {
+      incrementedPhoneNumber = (int.parse(currentPhoneNumber) + 1).toString();
+    } else {
+      // Handle the case where the currentPhoneNumber is not valid.
+      incrementedPhoneNumber = 'Invalid';
+    }
+
+    return incrementedPhoneNumber;
+  }
 
   void showSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
