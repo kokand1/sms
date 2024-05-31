@@ -14,6 +14,7 @@ class MyaApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const MaterialApp(
+      debugShowCheckedModeBanner: false,
       home: MyHomePage(),
     );
   }
@@ -33,23 +34,58 @@ class _MyHomePageState extends State<MyHomePage> {
   Timer? _timer;
   bool isPlaying = false;
   final Random _random = Random();
-  int countdown = 0;  // Added to track the countdown
-  Timer? _countdownTimer;  // Added to handle the countdown timer
+  int countdown = 0;
+  Timer? _countdownTimer;
+  String currentPhoneNumber = '+998906280800';
+  int sentSmsCount = 0; // Counter for the sent SMS messages
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("SMS"),
         centerTitle: true,
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.next_plan),
+            SizedBox(width: 20),
+            Text(
+              '${getIncrementedPhoneNumber()}',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        backgroundColor: Color.fromARGB(255, 3, 249, 52),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Text(
+              "Sent: $sentSmsCount",
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+        leading: Padding(
+          padding: const EdgeInsets.all(12),
+          child: CircleAvatar(
+            backgroundColor: Colors.white,
+            child: Padding(
+              padding: const EdgeInsets.only(right: 5),
+              child: Text(
+                ' $countdown',
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+        ),
       ),
       body: Padding(
         padding: const EdgeInsets.all(8.0),
         child: ListView(
           children: [
-            const SizedBox(
-              height: 20,
-            ),
+            const SizedBox(height: 20),
             TextField(
               controller: telNumerInput,
               keyboardType: TextInputType.phone,
@@ -58,7 +94,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   borderSide: BorderSide(color: Colors.red, width: 1),
                 ),
                 enabledBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: Colors.green, width: 1),
+                  borderSide: BorderSide(color: Color.fromARGB(255, 3, 249, 52), width: 1),
                 ),
                 hintText: "Number",
               ),
@@ -68,9 +104,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 }
               },
             ),
-            const SizedBox(
-              height: 20,
-            ),
+            const SizedBox(height: 20),
             TextField(
               controller: smsMatnInput,
               decoration: const InputDecoration(
@@ -78,34 +112,30 @@ class _MyHomePageState extends State<MyHomePage> {
                   borderSide: BorderSide(color: Colors.red, width: 1),
                 ),
                 enabledBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: Colors.green, width: 1),
+                  borderSide: BorderSide(color: Color.fromARGB(255, 3, 249, 52), width: 1),
                 ),
                 hintText: "Text",
               ),
-              minLines: 5,  // Minimum number of lines
-              maxLines: null, 
+              minLines: 5,
+              maxLines: null,
             ),
-            const SizedBox(
-              height: 20,
-            ),
-            if (isPlaying)  // Conditionally display the countdown
-              Text(
-                'Next SMS in: $countdown seconds',
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            const SizedBox(height: 20),
+            if (isPlaying)
+              Column(
+                children: [],
               ),
           ],
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        child: Icon(isPlaying ? Icons.pause : Icons.play_arrow),
+        child: Icon(isPlaying ? Icons.stop : Icons.play_arrow),
         onPressed: () async {
           if (await isPermissionGranted()) {
             bool? customSimSupport = await supportsCustomSim();
             if (customSimSupport != null && customSimSupport) {
               toggleSMS();
             } else {
-              // No custom SIM support
+              showSnackBar("Custom SIM support not available");
             }
           } else {
             getPermission();
@@ -117,15 +147,23 @@ class _MyHomePageState extends State<MyHomePage> {
 
   void toggleSMS() {
     if (isPlaying) {
-      _timer?.cancel();
-      _countdownTimer?.cancel();  // Cancel the countdown timer
+      pauseSMS();
     } else {
-      sendSMSPeriodically(smsMatnInput.text);
+      resumeSMS();
     }
 
     setState(() {
       isPlaying = !isPlaying;
     });
+  }
+
+  void pauseSMS() {
+    _timer?.cancel();
+    _countdownTimer?.cancel();
+  }
+
+  void resumeSMS() {
+    sendSMSPeriodically(smsMatnInput.text);
   }
 
   void sendSMSPeriodically(String message) {
@@ -157,20 +195,24 @@ class _MyHomePageState extends State<MyHomePage> {
       incrementedNumber,
     );
 
+    setState(() {
+      currentPhoneNumber = newPhoneNumber;
+    });
+
     sendSMS(newPhoneNumber, message);
 
-    lastFourDigits++; // Increment the last four digits for the next SMS
+    lastFourDigits++;
 
-    int delaySeconds = _random.nextInt(20) + 3; // Random delay between 3 and 10 seconds
-    countdown = delaySeconds;  // Initialize the countdown
+    int delaySeconds = _random.nextInt(20) + 3;
+    countdown = delaySeconds;
 
-    _countdownTimer?.cancel();  // Cancel any existing countdown timer
-    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {  // Create a periodic timer
+    _countdownTimer?.cancel();
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       setState(() {
         countdown--;
       });
 
-      if (countdown < 0) {
+      if (countdown <= 0) {
         timer.cancel();
       }
     });
@@ -191,6 +233,9 @@ class _MyHomePageState extends State<MyHomePage> {
     var result = await BackgroundSms.sendMessage(
         phoneNumber: phoneNumber, message: message, simSlot: simSlot);
     if (result == SmsStatus.sent) {
+      setState(() {
+        sentSmsCount++; // Increment the counter when an SMS is sent
+      });
       showSnackBar("Shu raqam $phoneNumber ga yuborildi");
     } else {
       showSnackBar("SMS yuborilmadi");
@@ -200,15 +245,27 @@ class _MyHomePageState extends State<MyHomePage> {
   Future<bool?> supportsCustomSim() async =>
       await BackgroundSms.isSupportCustomSim;
 
+  String getIncrementedPhoneNumber() {
+    String incrementedPhoneNumber = '';
+
+    if (currentPhoneNumber.isNotEmpty && int.tryParse(currentPhoneNumber) != null) {
+      incrementedPhoneNumber = (int.parse(currentPhoneNumber) + 1).toString();
+    } else {
+      incrementedPhoneNumber = 'Invalid';
+    }
+
+    return incrementedPhoneNumber;
+  }
+
   void showSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         duration: const Duration(seconds: 4),
         content: Text(
           message,
-          style: const TextStyle(color: Colors.white),
+          style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
         ),
-        backgroundColor: const Color.fromARGB(255, 24, 62, 25),
+        backgroundColor: Color.fromARGB(255, 3, 249, 52),
       ),
     );
   }
